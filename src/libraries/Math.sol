@@ -1,7 +1,7 @@
 pragma solidity ^0.8.14;
 
 import {FixedPoint96} from "./FixedPoint96.sol";
-import { mulDiv } from "prb-math/Common.sol";
+import "prb-math/Common.sol";
 
 library Math {
   function calcAmount0Delta(
@@ -23,11 +23,15 @@ library Math {
     );
   }
 
-  function calcAmount1Delta(sqrtPriceAX96, sqrtPriceBX96, liquidity) external returns (uint amount){
+  function calcAmount1Delta(
+    uint160 sqrtPriceAX96,
+    uint160 sqrtPriceBX96,
+    uint128 liquidity
+  ) external returns (uint amount){
     if(sqrtPriceBX96 > sqrtPriceAX96){
       (sqrtPriceAX96, sqrtPriceBX96) = (sqrtPriceBX96, sqrtPriceAX96);
     }
-    
+
     amount = mulDivRoundingUp(liquidity, sqrtPriceAX96 - sqrtPriceBX96, FixedPoint96.Q96);
   }
 
