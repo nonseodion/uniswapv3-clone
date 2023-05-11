@@ -4,7 +4,10 @@ import { IERC20Minimal as IERC20 } from "./interfaces/IERC20Minimal.sol";
 import { IUniswapV3MintCallback } from "./interfaces/IUniswapV3MintCallback.sol";
 import { IUniswapV3SwapCallback } from "./interfaces/IUniswapV3SwapCallback.sol";
 import { BitMath } from "./libraries/BitMath.sol";
+import { Math } from "./libraries/Math.sol";
+import { TickMath } from "./libraries/TickMath.sol";
 import "forge-std/console.sol";
+
 
 library Tick {
   struct Info {
@@ -158,11 +161,24 @@ contract UniswapV3Pool {
  
     Position.Info storage position = positions.get(owner, lowerTick, upperTick);
     position.update(amount);
-    
-    liquidity += amount;
 
-    amount0 = 0.998976618347425280 ether;
-    amount1 = 5000 ether;
+    Slot0 slot0_ = slot0;
+    // amount0 = 0.998976618347425280 ether;
+    // amount1 = 5000 ether;
+    amount0 = Math.calcAmount0Delta(
+      slot0_.sqrtPriceX96, 
+      TickMath.getSqrtRatioAtTick(upperTick), 
+      liquidity
+    );
+
+    amount1 = Math.calcAmount1Delta(
+      slot0_.sqrtPriceX96, 
+      TickMath.getSqrtRatioAtTick(lowerTick), 
+      liquidity
+    );
+
+    liquidity += amount;
+    
     uint balance0Before; 
     uint balance1Before;
 
