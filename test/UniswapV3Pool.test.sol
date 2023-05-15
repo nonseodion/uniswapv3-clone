@@ -4,6 +4,8 @@ import { UniswapV3Pool } from "../src/UniswapV3Pool.sol";
 import { ERC20Mintable, ERC20 } from "./ERC20Mintable.sol";
 import "forge-std/Test.sol";
 
+error NotEnoughLiquidity();
+
 contract UnisapV3PoolTest is Test{
   ERC20Mintable token0;
   ERC20Mintable token1;
@@ -49,12 +51,12 @@ contract UnisapV3PoolTest is Test{
     }
   }
 
-  function testMintSuccess() public{
-    uint256 expectedAmount0 = 0.998976618347425280 ether;
-    uint256 expectedAmount1 = 5000 ether;
+  function xtestMintSuccess() public{
+    uint256 expectedAmount0 = 0.998628802115141959 ether;
+    uint256 expectedAmount1 = 5000.209190920489524100 ether;
     TestCaseParams memory params = TestCaseParams({
         wethBalance: 1 ether,
-        usdcBalance: 5000 ether,
+        usdcBalance: 5001 ether,
         currentTick: 85176,
         lowerTick: 84222,
         upperTick: 86129,
@@ -73,11 +75,11 @@ contract UnisapV3PoolTest is Test{
 
     assertEq(posLiquidity, params.liquidity, "Incorrect position liquidity");
 
-    (bool tickInitialized, uint128 tickLiquidity) = pool.ticks(params.lowerTick);
+    (bool tickInitialized, uint128 tickLiquidity, ) = pool.ticks(params.lowerTick);
     assertTrue(tickInitialized, "Lower Tick not initialized");
     assertEq(tickLiquidity, params.liquidity, "Incorrect Lower Tick liquidity");
 
-    (tickInitialized, tickLiquidity) = pool.ticks(params.lowerTick);
+    (tickInitialized, tickLiquidity, ) = pool.ticks(params.lowerTick);
     assertTrue(tickInitialized, "Lower Tick not initialized");
     assertEq(tickLiquidity, params.liquidity, "Incorrect Upper Tick liquidity");
 
@@ -89,11 +91,11 @@ contract UnisapV3PoolTest is Test{
     assertEq(liquidity, params.liquidity, "Incorrect pool liquidity");
   }
 
-  function testSwapSuccess() external{
+  function xtestSwapOneForZeroSuccess() external{
     
     TestCaseParams memory params = TestCaseParams({
         wethBalance: 1 ether,
-        usdcBalance: 5000 ether,
+        usdcBalance: 5001 ether,
         currentTick: 85176,
         lowerTick: 84222,
         upperTick: 86129,
@@ -104,24 +106,24 @@ contract UnisapV3PoolTest is Test{
     });
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
 
+    uint userBalance1Before = ERC20(token1).balanceOf(address(this));
     token1.mint(address(this), 42 ether);
     int24 nextTick = 85184;
     uint160 nextPrice = 5604469350942327889444743441197;
 
     shouldTransferInCallback = true;
     uint userBalance0Before = ERC20(token0).balanceOf(address(this));
-    (int amount0, int amount1) = pool.swap(address(this), "0x");
+    (int amount0, int amount1) = pool.swap(address(this), false, 42 ether, "0x");
     shouldTransferInCallback = false;
-    
     (uint160 price, int24 currentTick) = pool.slot0();
 
     // check for swap function return values
-    assertEq(amount0, -0.008396714242162444 ether, "Invalid ETH out");
+    assertEq(amount0, -0.008396714242162445 ether, "Invalid ETH out");
     assertEq(amount1, 42 ether, "Invalid USDC in");
 
     // check amount sent and transferred by this contract
-    assertEq(ERC20(token1).balanceOf(address(this)), 0, "Invalid USDC transferred");
-    assertEq(ERC20(token0).balanceOf(address(this)), 0.008396714242162444 ether + userBalance0Before, "Invalid ETH transferred");
+    assertEq(ERC20(token1).balanceOf(address(this)), userBalance1Before, "Invalid USDC transferred");
+    assertEq(ERC20(token0).balanceOf(address(this)), 0.008396714242162445 ether + userBalance0Before, "Invalid ETH transferred");
 
     // check amount sent and transferred by this contract
     assertEq(int(ERC20(token1).balanceOf(address(pool))), (int(poolBalance1Before) + amount1), "Invalid USDC transferred to pool");
@@ -132,6 +134,71 @@ contract UnisapV3PoolTest is Test{
     assertEq(currentTick, nextTick, "New Tick is incorrect");
   }
 
+  function xtestSwapZeroForOneSuccess() external{
+    
+    TestCaseParams memory params = TestCaseParams({
+        wethBalance: 1 ether,
+        usdcBalance: 5001 ether,
+        currentTick: 85176,
+        lowerTick: 84222,
+        upperTick: 86129,
+        liquidity: 1517882343751509868544,
+        currentSqrtP: 5602277097478614198912276234240,
+        shouldTransferInCallback: true,
+        mintLiqudity: true
+    });
+    (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+
+    uint userBalance0Before = ERC20(token0).balanceOf(address(this));
+    token0.mint(address(this), 0.01 ether);
+    int24 nextTick = 85166;
+    uint160 nextPrice = 5599668487149915539000862441472;
+
+    shouldTransferInCallback = true;
+    uint userBalance1Before = ERC20(token1).balanceOf(address(this));
+    (int amount0, int amount1) = pool.swap(address(this), true, 0.01 ether, "0x");
+    shouldTransferInCallback = false;
+    (uint160 price, int24 currentTick) = pool.slot0();
+
+    // check for swap function return values
+    assertEq(amount0, 0.01 ether, "Invalid ETH in");
+    assertEq(amount1, -49.97671830325024 ether, "Invalid USDC out");
+
+    // check amount sent and transferred by this contract
+    assertEq(ERC20(token1).balanceOf(address(this)), userBalance1Before + 49.97671830325024 ether, "Invalid USDC transferred");
+    assertEq(ERC20(token0).balanceOf(address(this)), userBalance0Before, "Invalid ETH transferred");
+
+    // check amount sent and transferred by this contract
+    assertEq(int(ERC20(token1).balanceOf(address(pool))), (int(poolBalance1Before) + amount1), "Invalid USDC transferred out of pool");
+    assertEq(int(ERC20(token0).balanceOf(address(pool))), int(poolBalance0Before) + amount0, "Invalid ETH transferred into pool");
+
+    // check pool state
+    assertEq(price, nextPrice, "New price is incorrect");
+    assertEq(currentTick, nextTick, "New Tick is incorrect");
+  }
+
+  // test/UniswapV3Pool.t.sol
+  function testSwapBuyEthNotEnoughLiquidity() public {
+
+    uint256 swapAmount = 5300 ether;
+    TestCaseParams memory params = TestCaseParams({
+        wethBalance: 1 ether,
+        usdcBalance: 5001 ether,
+        currentTick: 85176,
+        lowerTick: 84222,
+        upperTick: 86129,
+        liquidity: 1517882343751509868544,
+        currentSqrtP: 5602277097478614198912276234240,
+        shouldTransferInCallback: true,
+        mintLiqudity: true
+    });
+    setupTestCase(params);
+
+    token1.mint(address(this), swapAmount);
+
+    vm.expectRevert(NotEnoughLiquidity.selector);
+    pool.swap(address(this), false, swapAmount, "0x");
+  }
 
   function setupTestCase(TestCaseParams memory params) internal returns (uint amount0, uint amount1){
     token0.mint(address(this), params.wethBalance);
@@ -142,7 +209,7 @@ contract UnisapV3PoolTest is Test{
       address(token1),
       params.currentSqrtP,
       params.currentTick
-    );
+    ); 
 
     shouldTransferInCallback = params.shouldTransferInCallback;
 

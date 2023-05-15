@@ -6,97 +6,13 @@ import { IUniswapV3SwapCallback } from "./interfaces/IUniswapV3SwapCallback.sol"
 import { BitMath } from "./libraries/BitMath.sol";
 import { Math } from "./libraries/Math.sol";
 import { TickMath } from "./libraries/TickMath.sol";
+import {SwapMath} from "./libraries/SwapMath.sol";
+import { Tick } from "./libraries/Tick.sol";
+import { Position } from "./libraries/Position.sol";
+import { TickBitMap } from "./libraries/TickBitMap.sol";
+import {LiquidityMath} from "./libraries/LiquidityMath.sol";
 import "forge-std/console.sol";
 
-
-library Tick {
-  struct Info {
-    bool initialized;
-    uint128 liquidity;
-  }
-
-  function update(mapping(int24 => Info) storage self, int24 tick, uint128 amount) public returns (bool flipped){
-    uint128 liquidityBefore = self[tick].liquidity;
-    uint128 liquidityAfter = liquidityBefore + amount;
-
-    flipped = (liquidityAfter == 0) != (liquidityBefore == 0);
-
-    if(liquidityBefore == 0){
-      self[tick].initialized = true;
-    }
-
-    self[tick].liquidity = liquidityAfter;
-  }
-}
-
-library Position {
-  struct Info {
-    uint128 liquidity;
-  }
-
-  function update(Info storage self, uint128 amount) public {
-    self.liquidity += amount;
-  }
-
-  function get(
-    mapping(bytes32 => Info) storage positions, 
-    address owner, 
-    int24 lowerTick, 
-    int24 upperTick
-  ) view public returns (Info storage) {
-    return positions[keccak256(abi.encodePacked(owner, lowerTick, upperTick))];
-  }
-}
-
-library TickBitMap{
-  function flipTick(
-    mapping(int16 => uint256) storage self,
-    int24 tick,
-    int24 tickSpacing
-  ) external
-  {
-    require(tick % tickSpacing == 0, "Wrong Tick Spacing or Tick");
-    (int16 wordPos, uint8 bitPos) = position(tick / tickSpacing);
-    uint256 mask = 1 << bitPos;
-    self[wordPos] ^= mask;
-  }
-
-  function nextInitializedTickWithinOneWord(
-    mapping(int16 => uint256) storage self,
-    int24 tick,
-    int24 tickSpacing,
-    bool lte
-  ) external view returns (int24 next, bool initialized){
-    int24 compressed = tick/tickSpacing;
-    
-    if(lte){
-
-      (int16 wordPos, uint8 bitPos) = position(compressed);
-      uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
-      uint256 masked = self[wordPos] & mask;
-      bool initialized = masked != 0;
-      int24 next = initialized 
-        ? (compressed - int24(uint24((bitPos - BitMath.mostSignificantBit(masked))))) * tickSpacing
-        : (compressed - int24(uint24(bitPos))) * tickSpacing;
-
-    }else {
-
-      (int16 wordPos, uint8 bitPos) = position(compressed + 1);
-      uint256 mask = ~(1 << (bitPos+1));
-      uint256 masked = self[wordPos] & mask;
-      bool initialized = masked != 0;
-      int24 next = initialized 
-        ? (compressed + 1 + int24(uint24(BitMath.leastSignificantBit(masked) - bitPos))) * tickSpacing
-        : (compressed + 1 + int24(uint24(type(uint8).max - bitPos))) * tickSpacing;
-
-    }
-  }
-
-  function position(int24 tick) private pure returns (int16 wordPos, uint8 bitPos) {
-    wordPos = int16(tick >> 8);
-    bitPos = uint8(uint24(tick) % 256);
-  }
-}
 
 contract UniswapV3Pool {
   using Tick for mapping(int24 => Tick.Info);
@@ -118,6 +34,22 @@ contract UniswapV3Pool {
     int24 tick;
   }
 
+  struct SwapState {
+    uint256 amountSpecifiedRemaining;
+    uint256 amountCalculated;
+    uint160 sqrtPriceX96;
+    int24 tick;
+    uint128 liquidity;
+  }
+
+  struct StepState {
+    uint160 sqrtPriceStartX96;
+    int24 nextTick;
+    uint160 sqrtPriceNextX96;
+    uint256 amountIn;
+    uint256 amountOut;
+  }
+
   Slot0 public slot0;
 
   uint128 public liquidity;
@@ -131,6 +63,7 @@ contract UniswapV3Pool {
   error InvalidTickRange();
   error ZeroLiquidity();
   error InsufficientInputAmount();
+  error NotEnoughLiquidity();
 
   constructor(address _token0, address _token1, uint160 _currentPrice, int24 _tick){
     token0 = _token0;
@@ -154,60 +87,145 @@ contract UniswapV3Pool {
 
     if(amount == 0) revert ZeroLiquidity();
 
-    bool flipUpper = ticks.update(upperTick, amount);
-    bool flipLower = ticks.update(lowerTick, amount);
+    bool flipUpper = ticks.update(upperTick, int128(amount), true);
+    bool flipLower = ticks.update(lowerTick, int128(amount), false);
     if(flipUpper) tickBitMap.flipTick(upperTick, 1);
     if(flipLower) tickBitMap.flipTick(lowerTick, 1);
  
     Position.Info storage position = positions.get(owner, lowerTick, upperTick);
     position.update(amount);
 
-    Slot0 slot0_ = slot0;
+    Slot0 memory slot0_ = slot0;
+
     // amount0 = 0.998976618347425280 ether;
     // amount1 = 5000 ether;
-    amount0 = Math.calcAmount0Delta(
-      slot0_.sqrtPriceX96, 
-      TickMath.getSqrtRatioAtTick(upperTick), 
-      liquidity
-    );
+    if(lowerTick > slot0_.tick){
+      amount0 = Math.calcAmount0Delta(
+        TickMath.getSqrtRatioAtTick(lowerTick), 
+        TickMath.getSqrtRatioAtTick(upperTick), 
+        amount
+      );
+    } else if(lowerTick < slot0_.tick){
+      amount0 = Math.calcAmount0Delta(
+        slot0_.sqrtPriceX96, 
+        TickMath.getSqrtRatioAtTick(upperTick), 
+        amount
+      );
 
-    amount1 = Math.calcAmount1Delta(
-      slot0_.sqrtPriceX96, 
-      TickMath.getSqrtRatioAtTick(lowerTick), 
-      liquidity
-    );
+      amount1 = Math.calcAmount1Delta(
+        slot0_.sqrtPriceX96, 
+        TickMath.getSqrtRatioAtTick(lowerTick), 
+        amount
+      );
 
-    liquidity += amount;
-    
-    uint balance0Before; 
-    uint balance1Before;
+      liquidity += amount;
+    } else 
+      amount1 = Math.calcAmount1Delta(
+        TickMath.getSqrtRatioAtTick(lowerTick), 
+        TickMath.getSqrtRatioAtTick(upperTick), 
+        amount
+      );
+    {
+      uint balance0Before; 
+      uint balance1Before;
 
-    if(amount0 > 0) balance0Before = balance0();
-    if(amount1 > 0) balance1Before = balance1();
-    
-    IUniswapV3MintCallback(msg.sender).uniswapV3MintCallback(amount0, amount1, data);
-    if(amount0 > 0 && balance0Before + amount0 > balance0())
-      revert InsufficientInputAmount();
-    if(amount1 > 0 && balance1Before + amount1 > balance1())
-      revert InsufficientInputAmount();
+      if(amount0 > 0) balance0Before = balance0();
+      if(amount1 > 0) balance1Before = balance1();
+      
+      IUniswapV3MintCallback(msg.sender).uniswapV3MintCallback(amount0, amount1, data);
+      if(amount0 > 0 && balance0Before + amount0 > balance0())
+        revert InsufficientInputAmount();
+      if(amount1 > 0 && balance1Before + amount1 > balance1())
+        revert InsufficientInputAmount();
+    }
 
     emit Mint(msg.sender, owner, lowerTick, upperTick, amount, amount0, amount1);
   }
 
-  function swap(address recipient, bytes calldata data) external returns(int amount0, int amount1){
-    int24 nextTick = 85184;
-    uint160 nextPrice = 5604469350942327889444743441197;
+  function swap(address recipient, bool zeroForOne, uint amountSpecified, bytes calldata data) external returns(int amount0, int amount1){
+    // int24 nextTick = 85184;
+    // uint160 nextPrice = 5604469350942327889444743441197;
+    uint128 liquidity_ = liquidity;
+    SwapState memory swapState = SwapState(
+      amountSpecified,
+      0,
+      slot0.sqrtPriceX96,
+      slot0.tick,
+      liquidity_
+    );
 
-    amount0 = -0.008396714242162444 ether;
-    amount1 = 42 ether;
+    while (swapState.amountSpecifiedRemaining > 0){
+      StepState memory stepState;
+      
+      stepState.sqrtPriceStartX96 = swapState.sqrtPriceX96;
+      (stepState.nextTick, ) = tickBitMap.nextInitializedTickWithinOneWord(
+        swapState.tick,
+        1,
+        zeroForOne
+      );
 
-    slot0 = Slot0(nextPrice, nextTick);
-    IERC20(token0).transfer(recipient, uint(-amount0));
 
-    uint balanceBefore = balance1();
-    IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount0, amount1, data);
-    if(balanceBefore + uint256(amount1) < balance1())
-      revert InsufficientInputAmount();
+      stepState.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(stepState.nextTick);
+      (swapState.sqrtPriceX96, stepState.amountIn, stepState.amountOut) = SwapMath.computeSwapStep(
+        swapState.sqrtPriceX96,
+        stepState.sqrtPriceNextX96,
+        swapState.liquidity,
+        swapState.amountSpecifiedRemaining
+      );
+
+      if(swapState.sqrtPriceX96 == stepState.sqrtPriceNextX96){
+        int128 liquidityDelta = ticks.cross(stepState.nextTick);
+
+        if(zeroForOne) liquidityDelta = -liquidityDelta;
+
+        swapState.liquidity = LiquidityMath.addLiquidity(
+          swapState.liquidity,
+          liquidityDelta
+        );
+
+        if(swapState.liquidity == 0) revert NotEnoughLiquidity();
+
+        swapState.tick = zeroForOne ? stepState.nextTick - 1 : stepState.nextTick;
+      }
+      else{
+        swapState.tick = TickMath.getTickAtSqrtRatio(swapState.sqrtPriceX96);
+      }
+
+      swapState.amountSpecifiedRemaining -= stepState.amountIn;
+      swapState.amountCalculated += stepState.amountOut;
+    }
+
+    if(swapState.liquidity != liquidity_) liquidity = swapState.liquidity;
+
+    if(slot0.tick != swapState.tick){
+      slot0 = Slot0(swapState.sqrtPriceX96, swapState.tick);
+    }
+
+    (amount0, amount1) = zeroForOne 
+      ? (
+        int256(amountSpecified - swapState.amountSpecifiedRemaining),
+        -int256(swapState.amountCalculated)
+      )
+      : (
+        -int256(swapState.amountCalculated),
+        int256(amountSpecified - swapState.amountSpecifiedRemaining)
+      );
+
+    if(zeroForOne){
+      IERC20(token1).transfer(recipient, uint256(-amount1));
+
+      uint balanceBefore = balance0();
+      IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount0, amount1, data);
+      if(balanceBefore + uint256(amount0) > balance0())
+        revert InsufficientInputAmount();
+    }else {
+      IERC20(token0).transfer(recipient, uint256(-amount0));
+
+      uint balanceBefore = balance1();
+      IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount0, amount1, data);
+      if(balanceBefore + uint256(amount1) > balance1())
+        revert InsufficientInputAmount();
+    }
 
     emit Swap(
       msg.sender,

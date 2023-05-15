@@ -10,8 +10,8 @@ contract UniswapV3Manager{
     address payer;
   }
 
-  function swap(address pool, address recipient, bytes calldata data) external {
-    UniswapV3Pool(pool).swap(recipient, data);
+  function swap(address pool, address recipient, uint256 amount, bool zeroForOne, bytes calldata data) external {
+    UniswapV3Pool(pool).swap(recipient, zeroForOne, amount, data);
   }
 
   function mint(address pool, address owner, uint128 amount, int24 lowerTick, int24 upperTick, bytes calldata data) external {

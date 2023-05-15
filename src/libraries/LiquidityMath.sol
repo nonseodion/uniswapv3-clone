@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.14;
 
-import {mulDiv} from "prb-math/Common.sol";
+import { mulDiv } from "prb-math/Common.sol";
 import "./FixedPoint96.sol";
 
 library LiquidityMath {
