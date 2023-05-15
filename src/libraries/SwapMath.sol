@@ -1,0 +1,44 @@
+pragma solidity ^0.8.14;
+
+import {Math} from "./Math.sol";
+import "forge-std/console.sol";
+
+library SwapMath{
+
+  function computeSwapStep(
+    uint160 sqrtPriceCurrentX96,
+    uint160 sqrtPriceTargetX96,
+    uint128 liquidity,
+    uint256 amountRemaining
+  ) internal
+    returns(
+      uint160 sqrtPriceNextX96,
+      uint amountIn,
+      uint amountOut
+    ){
+    bool zeroForOne = sqrtPriceCurrentX96 >= sqrtPriceTargetX96;
+    
+    amountIn = zeroForOne 
+      ? Math.calcAmount0Delta(sqrtPriceCurrentX96, sqrtPriceTargetX96, liquidity)
+      : Math.calcAmount1Delta(sqrtPriceCurrentX96, sqrtPriceTargetX96, liquidity);
+
+    if(amountRemaining >= amountIn){
+      sqrtPriceNextX96 = sqrtPriceTargetX96;
+    }
+    else {
+      sqrtPriceNextX96 = Math.getNextSqrtPriceFromInputAmount(
+        sqrtPriceCurrentX96,
+        amountRemaining,
+        liquidity,
+        zeroForOne
+      );
+    }
+    
+    amountIn = Math.calcAmount0Delta(sqrtPriceCurrentX96, sqrtPriceNextX96, liquidity);
+    amountOut = Math.calcAmount1Delta(sqrtPriceCurrentX96, sqrtPriceNextX96, liquidity);
+
+    if(!zeroForOne){
+      (amountIn, amountOut) = (amountOut, amountIn);
+    }
+  }
+}
