@@ -55,7 +55,6 @@ library Math {
   ) internal returns(uint160) {
     uint256 numerator = uint256(liquidity) << FixedPoint96.RESOLUTION;
     uint256 product = amountIn * sqrtPriceX96;
-    console.log(sqrtPriceX96, amountIn, liquidity);
     
     if(product / amountIn == sqrtPriceX96){
       uint256 denominator = numerator + product;

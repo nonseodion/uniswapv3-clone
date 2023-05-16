@@ -19,7 +19,7 @@ contract UniswapV3Pool {
   using Position for mapping(bytes32 => Position.Info);
   using Position for Position.Info;
   using TickBitMap for mapping(int16 => uint256);
-  mapping(int16 => uint256) tickBitMap;
+  mapping(int16 => uint256) public tickBitMap;
 
   int24 constant MIN_TICK = -887272;
   int24 constant MAX_TICK = 887272;
@@ -96,7 +96,6 @@ contract UniswapV3Pool {
     position.update(amount);
 
     Slot0 memory slot0_ = slot0;
-
     // amount0 = 0.998976618347425280 ether;
     // amount1 = 5000 ether;
     if(lowerTick > slot0_.tick){
@@ -153,7 +152,8 @@ contract UniswapV3Pool {
       slot0.tick,
       liquidity_
     );
-
+    
+    console.log("before loop");
     while (swapState.amountSpecifiedRemaining > 0){
       StepState memory stepState;
       
@@ -164,7 +164,7 @@ contract UniswapV3Pool {
         zeroForOne
       );
 
-
+      console.log("in loop1", uint24(swapState.tick));
       stepState.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(stepState.nextTick);
       (swapState.sqrtPriceX96, stepState.amountIn, stepState.amountOut) = SwapMath.computeSwapStep(
         swapState.sqrtPriceX96,
@@ -190,10 +190,11 @@ contract UniswapV3Pool {
       else{
         swapState.tick = TickMath.getTickAtSqrtRatio(swapState.sqrtPriceX96);
       }
-
+      console.log("in loop2", uint24(swapState.tick));
       swapState.amountSpecifiedRemaining -= stepState.amountIn;
       swapState.amountCalculated += stepState.amountOut;
     }
+
 
     if(swapState.liquidity != liquidity_) liquidity = swapState.liquidity;
 
