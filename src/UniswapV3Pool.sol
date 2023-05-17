@@ -64,6 +64,7 @@ contract UniswapV3Pool {
   error ZeroLiquidity();
   error InsufficientInputAmount();
   error NotEnoughLiquidity();
+  error InvalidPriceLimit();
 
   constructor(address _token0, address _token1, uint160 _currentPrice, int24 _tick){
     token0 = _token0;
@@ -147,7 +148,18 @@ contract UniswapV3Pool {
     emit Mint(msg.sender, owner, lowerTick, upperTick, amount, amount0, amount1);
   }
 
-  function swap(address recipient, bool zeroForOne, uint amountSpecified, bytes calldata data) external returns(int amount0, int amount1){
+  function swap(
+    address recipient, 
+    bool zeroForOne, 
+    uint256 amountSpecified, 
+    uint160 sqrtPriceLimit,
+    bytes calldata data
+  ) external returns(int amount0, int amount1){
+    if(zeroForOne 
+        ? slot0.sqrtPriceX96 < sqrtPriceLimit || sqrtPriceLimit < TickMath.MIN_SQRT_RATIO
+        : slot0.sqrtPriceX96 > sqrtPriceLimit || sqrtPriceLimit > TickMath.MAX_SQRT_RATIO
+      ) revert InvalidPriceLimit();
+
     // int24 nextTick = 85184;
     // uint160 nextPrice = 5604469350942327889444743441197;
     uint128 liquidity_ = liquidity;
@@ -160,7 +172,10 @@ contract UniswapV3Pool {
     );
     
     // console.log("before loop");
-    while (swapState.amountSpecifiedRemaining > 0){
+    while (
+      swapState.amountSpecifiedRemaining > 0
+      && swapState.sqrtPriceX96 != sqrtPriceLimit  
+    ){
       // console.log("loopstart");
       StepState memory stepState;
       
@@ -177,7 +192,15 @@ contract UniswapV3Pool {
 
       (swapState.sqrtPriceX96, stepState.amountIn, stepState.amountOut) = SwapMath.computeSwapStep(
         swapState.sqrtPriceX96,
-        stepState.sqrtPriceNextX96,
+        (
+          (
+            zeroForOne 
+              ? stepState.sqrtPriceNextX96 < sqrtPriceLimit
+              : stepState.sqrtPriceNextX96 > sqrtPriceLimit
+          ) 
+          ? sqrtPriceLimit
+          : stepState.sqrtPriceNextX96
+        ),
         swapState.liquidity,
         swapState.amountSpecifiedRemaining
       );

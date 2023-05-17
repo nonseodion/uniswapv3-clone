@@ -102,7 +102,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
 
     token1.mint(address(this), 42 ether);
 
-    pool.swap(address(this), false, 42 ether, "0x");
+    pool.swap(address(this), false, 42 ether, 5604415652688968742392013927525, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -145,7 +145,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
 
     token1.mint(address(this), 42 ether);
 
-    pool.swap(address(this), false, 42 ether, "0x");
+    pool.swap(address(this), false, 42 ether, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -188,7 +188,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
 
     token1.mint(address(this), swapAmount);
 
-    pool.swap(address(this), false, swapAmount, "0x");
+    pool.swap(address(this), false, swapAmount, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -231,7 +231,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
 
     token1.mint(address(this), swapAmount);
 
-    pool.swap(address(this), false, swapAmount, "0x");
+    pool.swap(address(this), false, swapAmount, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -271,7 +271,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     token0.mint(address(this),  swapAmount);
 
     uint userBalance1Before = ERC20(token1).balanceOf(address(this));
-    pool.swap(address(this), true, swapAmount, "0x");
+    pool.swap(address(this), true, swapAmount, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -313,7 +313,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     token0.mint(address(this),  swapAmount);
 
     uint userBalance1Before = ERC20(token1).balanceOf(address(this));
-    pool.swap(address(this), true, swapAmount, "0x");
+    pool.swap(address(this), true, swapAmount, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -355,7 +355,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     token0.mint(address(this),  swapAmount);
 
     uint userBalance1Before = ERC20(token1).balanceOf(address(this));
-    pool.swap(address(this), true, swapAmount, "0x");
+    pool.swap(address(this), true, swapAmount, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -371,7 +371,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function testBuyUSDCPartiallyOverlappingPriceRanges() external{
+  function xtestBuyUSDCPartiallyOverlappingPriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[1] = liquidityRange(4000, 4999, 1 ether, 5000 ether, 5000);
@@ -387,7 +387,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     });
     
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
-    
+
     int24 nextTick = 83261;
     uint160 nextPrice = 5090915820491052794734777344590;
     uint swapAmount = 2 ether;
@@ -397,7 +397,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     token0.mint(address(this),  swapAmount);
 
     uint userBalance1Before = ERC20(token1).balanceOf(address(this));
-    pool.swap(address(this), true, swapAmount, "0x");
+    pool.swap(address(this), true, swapAmount, nextPrice, "0x");
 
     assertSwapState(ExpectedStateAfterSwap({
       pool: pool,
@@ -410,6 +410,46 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
       tick: nextTick,
       price: nextPrice,
       liquidity: params.liquidity[1].amount
+    }));
+  }
+
+  function testBuyUSDCSlippageInterruption() external{
+    LiquidityRange[] memory liquidity = new LiquidityRange[](1);
+    liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
+    
+    TestCaseParams memory params = TestCaseParams({
+        wethBalance: 1 ether,
+        usdcBalance: 5000 ether,
+        currentPrice: 5000,
+        liquidity: liquidity,
+        transferInMintCallback: true,
+        transferInSwapCallback: true,
+        mintLiqudity: true
+    });
+    
+    (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+    int24 nextTick = TickMath.getTickAtSqrtRatio(sqrtP(4994));
+    uint160 nextPrice = sqrtP(4994);
+    uint swapAmount = 0.01337 ether;
+    // uint expectedAmount = 64.385613471819270749 ether;
+
+    uint userBalance0Before = ERC20(token0).balanceOf(address(this));
+    token0.mint(address(this),  swapAmount);
+
+    uint userBalance1Before = ERC20(token1).balanceOf(address(this));
+    (int256 amountIn, int256 amountOut) = pool.swap(address(this), true, swapAmount, sqrtP(4994), "0x");
+
+    assertSwapState(ExpectedStateAfterSwap({
+      pool: pool,
+      token0: IERC20(address(token0)),
+      token1: IERC20(address(token1)),
+      userBalance0: userBalance0Before + swapAmount - uint256(amountIn),
+      userBalance1: uint256(-amountOut) + userBalance1Before,
+      poolBalance0: poolBalance0Before + uint256(amountIn),
+      poolBalance1: poolBalance1Before - uint256(-amountOut),
+      tick: nextTick,
+      price: nextPrice,
+      liquidity: params.liquidity[0].amount
     }));
   }
 

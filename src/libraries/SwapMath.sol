@@ -13,8 +13,8 @@ library SwapMath{
   ) internal
     returns(
       uint160 sqrtPriceNextX96,
-      uint amountIn,
-      uint amountOut
+      uint256 amountIn,
+      uint256 amountOut
     ){
     bool zeroForOne = sqrtPriceCurrentX96 >= sqrtPriceTargetX96;
     

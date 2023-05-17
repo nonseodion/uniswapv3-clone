@@ -5,6 +5,7 @@ import { UniswapV3Pool } from "./UniswapV3Pool.sol";
 contract Quoter {
   function quote(
     uint256 amountIn,
+    uint160 priceLimit,
     address pool,
     bool zeroForOne
   ) public returns (uint256 amountOut, uint160 sqrtPriceAfter, int24 tick){
@@ -13,6 +14,7 @@ contract Quoter {
         address(this),
         zeroForOne,
         amountIn,
+        priceLimit,
         abi.encode(pool)
       )
     {}

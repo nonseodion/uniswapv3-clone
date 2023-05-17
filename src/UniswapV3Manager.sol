@@ -1,27 +1,60 @@
 pragma solidity ^0.8.14;
 
 import { UniswapV3Pool } from "./UniswapV3Pool.sol";
-import {IERC20Minimal as IERC20} from "./interfaces/IERC20Minimal.sol";
+import { IERC20Minimal as IERC20 } from "./interfaces/IERC20Minimal.sol";
+import { LiquidityMath } from "./libraries/LiquidityMath.sol";
+import { TickMath } from "./libraries/TickMath.sol";
 
 contract UniswapV3Manager{
+  error SlippageCheckFailed(uint256 amount0, uint256 amount1);
+
   struct CallbackData {
     address token0;
     address token1;
     address payer;
   }
 
-  function swap(address pool, address recipient, uint256 amount, bool zeroForOne, bytes calldata data) external {
-    UniswapV3Pool(pool).swap(recipient, zeroForOne, amount, data);
+  function swap(address pool, address recipient, uint256 amount, uint160 minPrice, bool zeroForOne, bytes calldata data) external {
+    UniswapV3Pool(pool).swap(recipient, zeroForOne, amount, minPrice, data);
   }
 
-  function mint(address pool, address owner, uint128 amount, int24 lowerTick, int24 upperTick, bytes calldata data) external {
-    UniswapV3Pool(pool).mint(
+  function mint(
+    address pool, 
+    address owner, 
+    int24 lowerTick, 
+    int24 upperTick,
+    uint256 amount0Desired, 
+    uint256 amount1Desired, 
+    uint256 amount0Min, 
+    uint256 amount1Min,  
+    bytes calldata data
+  ) external {
+    uint128 liquidity;
+    {
+      uint160 sqrtPriceAX96 = TickMath.getSqrtRatioAtTick(lowerTick);
+      uint160 sqrtPriceBX96 = TickMath.getSqrtRatioAtTick(lowerTick);
+      (uint160 currentPrice, ) = UniswapV3Pool(pool).slot0();
+      
+      liquidity = LiquidityMath.getLiquidityForAmounts(
+        currentPrice,
+        sqrtPriceAX96,
+        sqrtPriceBX96,
+        amount0Desired,
+        amount1Desired
+      );
+    }
+
+    (uint256 amount0, uint256 amount1) = UniswapV3Pool(pool).mint(
       owner,
-      amount,
+      liquidity,
       lowerTick,
       upperTick,
       data
     );
+
+    if(amount0 < amount0Min || amount1 < amount1Min){
+      revert SlippageCheckFailed(amount0, amount1);
+    }
   }
 
   function uniswapV3MintCallback(
