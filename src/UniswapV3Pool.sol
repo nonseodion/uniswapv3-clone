@@ -11,6 +11,7 @@ import { Tick } from "./libraries/Tick.sol";
 import { Position } from "./libraries/Position.sol";
 import { TickBitMap } from "./libraries/TickBitMap.sol";
 import {LiquidityMath} from "./libraries/LiquidityMath.sol";
+import { IUniswapV3FlashCallback } from "./interfaces/IUniswapV3FlashCallback.sol";
 import "forge-std/console.sol";
 
 
@@ -24,8 +25,8 @@ contract UniswapV3Pool {
   int24 constant MIN_TICK = -887272;
   int24 constant MAX_TICK = 887272;
 
-  address immutable token0;
-  address immutable token1;
+  address public immutable token0;
+  address public immutable token1;
 
   struct Slot0 {
     // current price in Q notation
@@ -59,6 +60,7 @@ contract UniswapV3Pool {
 
   event Mint(address minter, address owner, int24 lowerTick, int24 upperTick, uint128 amount, uint amount0, uint amount1);
   event Swap(address swapper, address recipient, int256 amount0Delta, int256 amount1Delta, uint160 sqrtPriceX96, uint128 liquidity, int24 tick);
+  event Flash(address borrower, uint256 amount0, uint256 amount1);
 
   error InvalidTickRange();
   error ZeroLiquidity();
@@ -66,7 +68,7 @@ contract UniswapV3Pool {
   error NotEnoughLiquidity();
   error InvalidPriceLimit();
 
-  constructor(address _token0, address _token1, uint160 _currentPrice, int24 _tick){
+  constructor(){
     token0 = _token0;
     token1 = _token1;
 
@@ -271,6 +273,25 @@ contract UniswapV3Pool {
       liquidity,
       slot0.tick
     );
+  }
+
+  function flash(
+    uint256 amount0,
+    uint256 amount1,
+    bytes calldata data
+  ) external {
+    uint256 balance0Before = balance0();
+    uint256 balance1Before = balance1();
+
+    if(amount0 > 0) IERC20(token0).transfer(msg.sender, amount0);
+    if(amount1 > 0) IERC20(token1).transfer(msg.sender, amount1);
+
+    IUniswapV3FlashCallback(msg.sender).uniswapV3FlashCallback(data);
+
+    require(balance0Before <= balance0(), "Flash amount0 not repaid");
+    require(balance1Before <= balance1(), "Flash amount1 not repaid");
+
+    emit Flash(msg.sender, amount0, amount1);
   }
 
   function balance0() internal view returns (uint) {
