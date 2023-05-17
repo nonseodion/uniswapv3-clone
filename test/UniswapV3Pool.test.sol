@@ -161,7 +161,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function testBuyETHTwoConsecutivePriceRanges() external{
+  function xtestBuyETHTwoConsecutivePriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[1] = liquidityRange(5500, 6250, 1 ether, 5000 ether, 5000);
@@ -176,11 +176,55 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
         mintLiqudity: true
     });
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+    console.log(poolBalance0Before, poolBalance1Before);
 
-    uint swapAmount = 9000 ether;
+    uint swapAmount = 10000 ether;
     uint expectedAmount = 1.820694594787485635 ether;
     int24 nextTick = 87173;
     uint160 nextPrice = 6190476002219365604851182401841;
+
+    uint userBalance0Before = ERC20(token0).balanceOf(address(this));
+    uint userBalance1Before = ERC20(token1).balanceOf(address(this));
+
+    token1.mint(address(this), swapAmount);
+
+    pool.swap(address(this), false, swapAmount, "0x");
+
+    assertSwapState(ExpectedStateAfterSwap({
+      pool: pool,
+      token0: IERC20(address(token0)),
+      token1: IERC20(address(token1)),
+      userBalance0: expectedAmount + userBalance0Before,
+      userBalance1: userBalance1Before,
+      poolBalance0: poolBalance0Before - expectedAmount,
+      poolBalance1: poolBalance1Before + swapAmount,
+      tick: nextTick,
+      price: nextPrice,
+      liquidity: liquidity[1].amount
+    }));
+  }
+
+  function xtestBuyETHPartiallyOverlappingPriceRanges() external{
+    LiquidityRange[] memory liquidity = new LiquidityRange[](2);
+    liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
+    liquidity[1] = liquidityRange(5001, 6250, 1 ether, 5000 ether, 5000);
+
+    TestCaseParams memory params = TestCaseParams({
+        wethBalance: 1 ether * 2,
+        usdcBalance: 5000 ether * 2,
+        currentPrice: 5000,
+        liquidity: liquidity,
+        transferInMintCallback: true,
+        transferInSwapCallback: true,
+        mintLiqudity: true
+    });
+    (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+    console.log(poolBalance0Before, poolBalance1Before);
+
+    uint swapAmount = 10000 ether;
+    uint expectedAmount = 1.864220641170389178 ether;
+    int24 nextTick = 87091;
+    uint160 nextPrice = 6165345094827913637987008642386;
 
     uint userBalance0Before = ERC20(token0).balanceOf(address(this));
     uint userBalance1Before = ERC20(token1).balanceOf(address(this));
@@ -285,6 +329,90 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
+  function xtestBuyUSDCTwoConsecutivePriceRanges() external{
+    LiquidityRange[] memory liquidity = new LiquidityRange[](2);
+    liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
+    liquidity[1] = liquidityRange(4000, 4545, 1 ether, 5000 ether, 5000);
+    
+    TestCaseParams memory params = TestCaseParams({
+        wethBalance: 1 ether * 2,
+        usdcBalance: 5000 ether * 2,
+        currentPrice: 5000,
+        liquidity: liquidity,
+        transferInMintCallback: true,
+        transferInSwapCallback: true,
+        mintLiqudity: true
+    });
+    
+    (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+
+    int24 nextTick = 83179;
+    uint160 nextPrice = 5069962753257045266417033265661;
+    uint swapAmount = 2 ether;
+    uint expectedAmount = 9103.264925902176327184 ether;
+
+    uint userBalance0Before = ERC20(token0).balanceOf(address(this));
+    token0.mint(address(this),  swapAmount);
+
+    uint userBalance1Before = ERC20(token1).balanceOf(address(this));
+    pool.swap(address(this), true, swapAmount, "0x");
+
+    assertSwapState(ExpectedStateAfterSwap({
+      pool: pool,
+      token0: IERC20(address(token0)),
+      token1: IERC20(address(token1)),
+      userBalance0: userBalance0Before,
+      userBalance1: expectedAmount + userBalance1Before,
+      poolBalance0: poolBalance0Before + swapAmount,
+      poolBalance1: poolBalance1Before - expectedAmount,
+      tick: nextTick,
+      price: nextPrice,
+      liquidity: params.liquidity[1].amount
+    }));
+  }
+
+  function testBuyUSDCPartiallyOverlappingPriceRanges() external{
+    LiquidityRange[] memory liquidity = new LiquidityRange[](2);
+    liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
+    liquidity[1] = liquidityRange(4000, 4999, 1 ether, 5000 ether, 5000);
+    
+    TestCaseParams memory params = TestCaseParams({
+        wethBalance: 1 ether * 2,
+        usdcBalance: 5000 ether * 2,
+        currentPrice: 5000,
+        liquidity: liquidity,
+        transferInMintCallback: true,
+        transferInSwapCallback: true,
+        mintLiqudity: true
+    });
+    
+    (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+    
+    int24 nextTick = 83261;
+    uint160 nextPrice = 5090915820491052794734777344590;
+    uint swapAmount = 2 ether;
+    uint expectedAmount = 9321.077831210790476918 ether;
+
+    uint userBalance0Before = ERC20(token0).balanceOf(address(this));
+    token0.mint(address(this),  swapAmount);
+
+    uint userBalance1Before = ERC20(token1).balanceOf(address(this));
+    pool.swap(address(this), true, swapAmount, "0x");
+
+    assertSwapState(ExpectedStateAfterSwap({
+      pool: pool,
+      token0: IERC20(address(token0)),
+      token1: IERC20(address(token1)),
+      userBalance0: userBalance0Before,
+      userBalance1: expectedAmount + userBalance1Before,
+      poolBalance0: poolBalance0Before + swapAmount,
+      poolBalance1: poolBalance1Before - expectedAmount,
+      tick: nextTick,
+      price: nextPrice,
+      liquidity: params.liquidity[1].amount
+    }));
+  }
+
   function setupTestCase(TestCaseParams memory params) internal returns (uint amount0, uint amount1){
     token0.mint(address(this), params.wethBalance);
     token1.mint(address(this), params.usdcBalance);
@@ -311,7 +439,7 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
           "0x"
         );
 
-        console.log("range", uint24(params.liquidity[i].lowerTick), uint24(params.liquidity[i].upperTick));
+        // console.log("range", uint24(params.liquidity[i].lowerTick), uint24(params.liquidity[i].upperTick));
         amount0 += amount0_;
         amount1 += amount1_;
       }

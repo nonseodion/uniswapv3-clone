@@ -84,6 +84,7 @@ contract UniswapV3Pool {
       || lowerTick < MIN_TICK
       || upperTick > MAX_TICK
     ) revert InvalidTickRange();
+    // console.log("1");
 
     if(amount == 0) revert ZeroLiquidity();
 
@@ -98,13 +99,16 @@ contract UniswapV3Pool {
     Slot0 memory slot0_ = slot0;
     // amount0 = 0.998976618347425280 ether;
     // amount1 = 5000 ether;
+    // console.log("2");
     if(lowerTick > slot0_.tick){
+      // console.log("22");
       amount0 = Math.calcAmount0Delta(
         TickMath.getSqrtRatioAtTick(lowerTick), 
         TickMath.getSqrtRatioAtTick(upperTick), 
         amount
       );
-    } else if(lowerTick < slot0_.tick){
+    } else if(upperTick > slot0_.tick){
+      // console.log("3");
       amount0 = Math.calcAmount0Delta(
         slot0_.sqrtPriceX96, 
         TickMath.getSqrtRatioAtTick(upperTick), 
@@ -118,12 +122,14 @@ contract UniswapV3Pool {
       );
 
       liquidity += amount;
-    } else 
+    } else {
+      // console.log("4");
       amount1 = Math.calcAmount1Delta(
         TickMath.getSqrtRatioAtTick(lowerTick), 
         TickMath.getSqrtRatioAtTick(upperTick), 
         amount
       );
+    }
     {
       uint balance0Before; 
       uint balance1Before;
@@ -153,19 +159,22 @@ contract UniswapV3Pool {
       liquidity_
     );
     
-    console.log("before loop");
+    // console.log("before loop");
     while (swapState.amountSpecifiedRemaining > 0){
+      // console.log("loopstart");
       StepState memory stepState;
       
       stepState.sqrtPriceStartX96 = swapState.sqrtPriceX96;
+      // console.log("1");
       (stepState.nextTick, ) = tickBitMap.nextInitializedTickWithinOneWord(
         swapState.tick,
         1,
         zeroForOne
       );
+      // console.log("2");
 
-      console.log("in loop1", uint24(swapState.tick));
       stepState.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(stepState.nextTick);
+
       (swapState.sqrtPriceX96, stepState.amountIn, stepState.amountOut) = SwapMath.computeSwapStep(
         swapState.sqrtPriceX96,
         stepState.sqrtPriceNextX96,
@@ -190,7 +199,9 @@ contract UniswapV3Pool {
       else{
         swapState.tick = TickMath.getTickAtSqrtRatio(swapState.sqrtPriceX96);
       }
-      console.log("in loop2", uint24(swapState.tick));
+
+      // console.log(uint24(swapState.tick), stepState.amountIn);
+      // console.log(swapState.amountSpecifiedRemaining, swapState.amountCalculated, stepState.amountOut);
       swapState.amountSpecifiedRemaining -= stepState.amountIn;
       swapState.amountCalculated += stepState.amountOut;
     }

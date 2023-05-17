@@ -1,6 +1,7 @@
 pragma solidity ^0.8.14;
 
 import { BitMath } from "./BitMath.sol";
+import "forge-std/Test.sol";
 
 library TickBitMap{
   function flipTick(
@@ -34,14 +35,15 @@ library TickBitMap{
         : (compressed - int24(uint24(bitPos))) * tickSpacing;
 
     }else {
-
+      
       (int16 wordPos, uint8 bitPos) = position(compressed + 1);
-      uint256 mask = ~(1 << (bitPos+1));
+      uint256 mask = ~((1 << bitPos) - 1);
       uint256 masked = self[wordPos] & mask;
       initialized = masked != 0;
       next = initialized 
         ? (compressed + 1 + int24(uint24(BitMath.leastSignificantBit(masked) - bitPos))) * tickSpacing
         : (compressed + 1 + int24(uint24(type(uint8).max - bitPos))) * tickSpacing;
+      
     }
   }
 

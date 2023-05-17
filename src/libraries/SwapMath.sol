@@ -1,6 +1,6 @@
 pragma solidity ^0.8.14;
 
-import {Math} from "./Math.sol";
+import { Math } from "./Math.sol";
 import "forge-std/console.sol";
 
 library SwapMath{
