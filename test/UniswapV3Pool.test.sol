@@ -4,18 +4,25 @@ import { UniswapV3Pool, TickMath } from "../src/UniswapV3Pool.sol";
 import { ERC20Mintable, ERC20 } from "./ERC20Mintable.sol";
 import { UniswapV3PoolUtils } from "./UniswapV3Pool.Utils.test.sol";
 import { IERC20Minimal as IERC20 } from "../src/interfaces/IERC20Minimal.sol";
+import { PoolAddress } from "../src/libraries/PoolAddress.sol";
+import { UniswapV3Factory } from "../src/UniswapV3Factory.sol";
 import "forge-std/Test.sol";
 
 error NotEnoughLiquidity();
 
-contract UnisapV3PoolTest is UniswapV3PoolUtils{
+contract UniswapV3PoolTest is UniswapV3PoolUtils{
   ERC20Mintable token0;
   ERC20Mintable token1;
   UniswapV3Pool pool;
+  UniswapV3Factory factory;
+
+  uint24 immutable tickSpacing = 60;
+
   bool shouldTransferInMintCallback;
   bool shouldTransferInSwapCallback;
 
   function setUp() public{
+    factory = new UniswapV3Factory();
     token0 = new ERC20Mintable("Ethereum", "Ether", 18);
     token1 = new ERC20Mintable("US Dollars", "USDC", 18);
   }
@@ -426,8 +433,17 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
         transferInSwapCallback: true,
         mintLiqudity: true
     });
-    
+
+    console.log(20);
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
+    console.log(23);
+
+    console.log(address(pool), PoolAddress.computeAddress(
+      address(factory),
+      address(token0),
+      address(token1),
+      tickSpacing
+    ));
     int24 nextTick = TickMath.getTickAtSqrtRatio(sqrtP(4994));
     uint160 nextPrice = sqrtP(4994);
     uint swapAmount = 0.01337 ether;
@@ -456,19 +472,19 @@ contract UnisapV3PoolTest is UniswapV3PoolUtils{
   function setupTestCase(TestCaseParams memory params) internal returns (uint amount0, uint amount1){
     token0.mint(address(this), params.wethBalance);
     token1.mint(address(this), params.usdcBalance);
-
-    pool = new UniswapV3Pool(
-      address(token0),
-      address(token1),
-      sqrtP(params.currentPrice),
-      TickMath.getTickAtSqrtRatio(sqrtP(params.currentPrice))
-    ); 
+    console.log("a");
+    pool = UniswapV3Pool(
+      factory.createPool(
+        address(token0),
+        address(token1),
+        tickSpacing
+      )
+    );
+    pool.initialize(sqrtP(params.currentPrice));
 
     shouldTransferInMintCallback = params.transferInMintCallback;
     shouldTransferInSwapCallback = params.transferInSwapCallback;
     
-
-
     if(params.mintLiqudity){
       for(uint256 i; i < params.liquidity.length; i++){
         (uint256 amount0_, uint256 amount1_) = pool.mint(

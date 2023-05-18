@@ -15,7 +15,7 @@ contract DeployDevelopment is Script {
     vm.startBroadcast();
     ERC20Mintable token0 = new ERC20Mintable("Ethereum", "ETH", 18);
     ERC20Mintable token1 = new ERC20Mintable("USDC", "USDC", 18);
-    UniswapV3Pool pool = new UniswapV3Pool(address(token0), address(token1), currentSqrtP, currentTick);
+    // UniswapV3Pool pool = new UniswapV3Pool(address(token0), address(token1), currentSqrtP, currentTick);
     UniswapV3Manager manager = new UniswapV3Manager();
 
     token0.mint(msg.sender, 1 ether);
@@ -23,7 +23,7 @@ contract DeployDevelopment is Script {
     vm.stopBroadcast();
 
     console.log("Manager: ", address(manager));    
-    console.log("Pool: ", address(pool));   
+    // console.log("Pool: ", address(pool));    
     console.log("Token0: ", address(token0));
     console.log("Token1: ", address(token1));
   }

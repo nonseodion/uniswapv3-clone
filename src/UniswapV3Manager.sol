@@ -14,8 +14,8 @@ contract UniswapV3Manager{
     address payer;
   }
 
-  function swap(address pool, address recipient, uint256 amount, uint160 minPrice, bool zeroForOne, bytes calldata data) external {
-    UniswapV3Pool(pool).swap(recipient, zeroForOne, amount, minPrice, data);
+  function swap(address pool, address recipient, uint256 amount, uint160 minSqrtPriceX69, bool zeroForOne, bytes calldata data) external {
+    UniswapV3Pool(pool).swap(recipient, zeroForOne, amount, minSqrtPriceX69, data);
   }
 
   function mint(
@@ -75,5 +75,14 @@ contract UniswapV3Manager{
     CallbackData memory extra = abi.decode(data, (CallbackData)); 
     if(amount0Delta > 0) IERC20(extra.token0).transferFrom(extra.payer, msg.sender, uint(amount0Delta));
     if(amount1Delta > 0) IERC20(extra.token0).transferFrom(extra.payer, msg.sender, uint(amount1Delta));
+  }
+
+  function uniswapV3FlashCallback(bytes calldata data) external {
+    (uint256 amount0, uint256 amount1) = abi.decode(data, (uint256, uint256));
+    IERC20 token0 = IERC20(UniswapV3Pool(msg.sender).token0());
+    IERC20 token1 = IERC20(UniswapV3Pool(msg.sender).token1());
+
+    token0.transfer(msg.sender, amount0);
+    token1.transfer(msg.sender, amount1);
   }
 }

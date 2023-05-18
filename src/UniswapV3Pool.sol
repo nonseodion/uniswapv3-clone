@@ -12,6 +12,7 @@ import { Position } from "./libraries/Position.sol";
 import { TickBitMap } from "./libraries/TickBitMap.sol";
 import {LiquidityMath} from "./libraries/LiquidityMath.sol";
 import { IUniswapV3FlashCallback } from "./interfaces/IUniswapV3FlashCallback.sol";
+import { IUniswapV3PoolDeployer } from "./interfaces/IUniswapV3PoolDeployer.sol";
 import "forge-std/console.sol";
 
 
@@ -69,10 +70,12 @@ contract UniswapV3Pool {
   error InvalidPriceLimit();
 
   constructor(){
-    token0 = _token0;
-    token1 = _token1;
+    (, token0, token1, ) = IUniswapV3PoolDeployer(msg.sender).parameters(); 
+  }
 
-    slot0 = Slot0({tick: _tick, sqrtPriceX96: _currentPrice});
+  function initialize(uint160 sqrtPriceX96) public {
+    int24 tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96);
+    slot0 = Slot0({tick: tick, sqrtPriceX96: sqrtPriceX96});
   }
 
   function mint(
