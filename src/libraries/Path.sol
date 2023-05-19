@@ -1,6 +1,11 @@
 pragma solidity ^0.8.14;
 
+import { BytesLib } from "../../lib/solidity-bytes-utils/contracts/BytesLib.sol";
+
 library Path {
+  using BytesLib for bytes;
+  using { toUint24 } for bytes;
+
   // @dev the byte-length of an address in the path
   uint private constant ADDRESS_SIZE = 20;
   // @dev the byte-length of a tick spacing in the path
@@ -21,6 +26,27 @@ library Path {
   }
 
   function getFirstPool(bytes memory path) pure internal returns(bytes memory pool) {
-    
+    return path.slice(0, POP_SIZE);
+  }
+
+  function skipToken(bytes memory path) pure internal returns(bytes memory pool) {
+    return path.slice(NEXT_OFFSET_SIZE, path.length - NEXT_OFFSET_SIZE);
+  }
+
+  function decodeFirstPool(bytes memory path) pure internal returns(address tokenIn, address tokenOut, uint24 tickSpacing){
+    tokenIn = path.toAddress(0);
+    tokenOut = path.toAddress(POP_SIZE);
+    tickSpacing = path.toUint24(ADDRESS_SIZE);
+  }
+
+  function toUint24(bytes memory _bytes, uint256 _start) pure internal returns(uint24){
+    require(_bytes.length >= _start+3, "toUint24_outOfBounds");
+    uint24 tempUint;
+
+    assembly {
+      tempUint := mload(add(add( _bytes, 0x3 ), _start))
+    }
+
+    return tempUint;
   }
 }
