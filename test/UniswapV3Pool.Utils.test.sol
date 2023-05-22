@@ -27,7 +27,7 @@ abstract contract UniswapV3PoolUtils is TestUtils{
     uint256 amount0,
     uint256 amount1,
     uint256 currentPrice
-  ) internal pure returns (LiquidityRange memory range){
+  ) internal  returns (LiquidityRange memory range){
     range.lowerTick = tick(lowerPrice);
     range.upperTick = tick(upperPrice);
     range.amount = LiquidityMath.getLiquidityForAmounts(

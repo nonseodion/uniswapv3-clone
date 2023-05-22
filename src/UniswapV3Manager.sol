@@ -7,6 +7,7 @@ import { TickMath } from "./libraries/TickMath.sol";
 import { Path } from "./libraries/Path.sol";
 import { PoolAddress } from "./libraries/PoolAddress.sol";
 import {UniswapV3Pool} from "./UniswapV3Pool.sol";
+import "forge-std/Test.sol";
 
 contract UniswapV3Manager{
   using Path for bytes;
@@ -15,6 +16,12 @@ contract UniswapV3Manager{
 
   struct SwapCallbackData{
     bytes path;
+    address payer;
+  }
+
+  struct MintCallbackData{
+    address token0;
+    address token1;
     address payer;
   }
 
@@ -35,12 +42,6 @@ contract UniswapV3Manager{
 
   error SlippageCheckFailed(uint256 amount0, uint256 amount1);
   error TooLittleReceivedAmount(uint256 amountOut);
-
-  struct CallbackData {
-    address token0;
-    address token1;
-    address payer;
-  }
 
   constructor(address factory_){
     factory = factory_;
@@ -94,14 +95,13 @@ contract UniswapV3Manager{
     uint256 amount1Desired, 
     uint256 amount0Min, 
     uint256 amount1Min,  
-    bytes calldata data
-  ) external {
+    MintCallbackData calldata data
+  ) external returns (uint256 amount0, uint256 amount1) {
     uint128 liquidity;
     {
       uint160 sqrtPriceAX96 = TickMath.getSqrtRatioAtTick(lowerTick);
-      uint160 sqrtPriceBX96 = TickMath.getSqrtRatioAtTick(lowerTick);
+      uint160 sqrtPriceBX96 = TickMath.getSqrtRatioAtTick(upperTick);
       (uint160 currentPrice, ) = UniswapV3Pool(pool).slot0();
-      
       liquidity = LiquidityMath.getLiquidityForAmounts(
         currentPrice,
         sqrtPriceAX96,
@@ -111,12 +111,12 @@ contract UniswapV3Manager{
       );
     }
 
-    (uint256 amount0, uint256 amount1) = UniswapV3Pool(pool).mint(
+    (amount0, amount1) = UniswapV3Pool(pool).mint(
       owner,
       liquidity,
       lowerTick,
       upperTick,
-      data
+      abi.encode(data)
     );
 
     if(amount0 < amount0Min || amount1 < amount1Min){
@@ -172,7 +172,8 @@ contract UniswapV3Manager{
       uint256 amount1Owed,
       bytes calldata data
   ) external {
-    CallbackData memory extra = abi.decode(data, (CallbackData)); 
+    MintCallbackData memory extra = abi.decode(data, (MintCallbackData)); 
+    
     IERC20(extra.token0).transferFrom(extra.payer, msg.sender, amount0Owed);
     IERC20(extra.token1).transferFrom(extra.payer, msg.sender, amount1Owed);
   }

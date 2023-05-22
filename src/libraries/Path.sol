@@ -35,7 +35,7 @@ library Path {
 
   function decodeFirstPool(bytes memory path) pure internal returns(address tokenIn, address tokenOut, uint24 tickSpacing){
     tokenIn = path.toAddress(0);
-    tokenOut = path.toAddress(POP_SIZE);
+    tokenOut = path.toAddress(NEXT_OFFSET_SIZE);
     tickSpacing = path.toUint24(ADDRESS_SIZE);
   }
 

@@ -49,7 +49,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }
   }
 
-  function xtestMint() public{
+  function testMint() public{
     LiquidityRange[] memory liquidity = new LiquidityRange[](1);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
 
@@ -84,7 +84,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     );
   }
 
-  function xtestBuyETHOnePriceRange() external{
+  function testBuyETHOnePriceRange() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](1);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
 
@@ -125,7 +125,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyETHTwoEqualPriceRanges() external{
+  function testBuyETHTwoEqualPriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     LiquidityRange memory range = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[0] = range;
@@ -168,7 +168,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyETHTwoConsecutivePriceRanges() external{
+  function testBuyETHTwoConsecutivePriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[1] = liquidityRange(5500, 6250, 1 ether, 5000 ether, 5000);
@@ -183,7 +183,6 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
         mintLiqudity: true
     });
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
-    console.log(poolBalance0Before, poolBalance1Before);
 
     uint swapAmount = 10000 ether;
     uint expectedAmount = 1.820694594787485635 ether;
@@ -211,7 +210,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyETHPartiallyOverlappingPriceRanges() external{
+  function testBuyETHPartiallyOverlappingPriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[1] = liquidityRange(5001, 6250, 1 ether, 5000 ether, 5000);
@@ -226,7 +225,6 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
         mintLiqudity: true
     });
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
-    console.log(poolBalance0Before, poolBalance1Before);
 
     uint swapAmount = 10000 ether;
     uint expectedAmount = 1.864220641170389178 ether;
@@ -254,7 +252,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyUSDCOnePriceRange() external{
+  function testBuyUSDCOnePriceRange() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](1);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     
@@ -294,7 +292,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyUSDCTwoEqualPriceRanges() external{
+  function testBuyUSDCTwoEqualPriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     LiquidityRange memory range = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[0] = range;
@@ -336,7 +334,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyUSDCTwoConsecutivePriceRanges() external{
+  function testBuyUSDCTwoConsecutivePriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[1] = liquidityRange(4000, 4545, 1 ether, 5000 ether, 5000);
@@ -378,7 +376,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
     }));
   }
 
-  function xtestBuyUSDCPartiallyOverlappingPriceRanges() external{
+  function testBuyUSDCPartiallyOverlappingPriceRanges() external{
     LiquidityRange[] memory liquidity = new LiquidityRange[](2);
     liquidity[0] = liquidityRange(4545, 5500, 1 ether, 5000 ether, 5000);
     liquidity[1] = liquidityRange(4000, 4999, 1 ether, 5000 ether, 5000);
@@ -434,20 +432,10 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
         mintLiqudity: true
     });
 
-    console.log(20);
     (uint poolBalance0Before, uint poolBalance1Before) = setupTestCase(params);
-    console.log(23);
-
-    console.log(address(pool), PoolAddress.computeAddress(
-      address(factory),
-      address(token0),
-      address(token1),
-      tickSpacing
-    ));
     int24 nextTick = TickMath.getTickAtSqrtRatio(sqrtP(4994));
     uint160 nextPrice = sqrtP(4994);
     uint swapAmount = 0.01337 ether;
-    // uint expectedAmount = 64.385613471819270749 ether;
 
     uint userBalance0Before = ERC20(token0).balanceOf(address(this));
     token0.mint(address(this),  swapAmount);
@@ -472,7 +460,6 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
   function setupTestCase(TestCaseParams memory params) internal returns (uint amount0, uint amount1){
     token0.mint(address(this), params.wethBalance);
     token1.mint(address(this), params.usdcBalance);
-    console.log("a");
     pool = UniswapV3Pool(
       factory.createPool(
         address(token0),
@@ -495,7 +482,6 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
           "0x"
         );
 
-        // console.log("range", uint24(params.liquidity[i].lowerTick), uint24(params.liquidity[i].upperTick));
         amount0 += amount0_;
         amount1 += amount1_;
       }

@@ -109,4 +109,26 @@ abstract contract TestUtils is Test {
 
     return (onlyTick & bitMap != 0);
   }
+
+  function divRound(int128 x, int128 y) internal pure returns (int128 result){
+    int128 quot = ABDKMath64x64.div(x, y);
+    result = quot >> 64;
+
+    if((quot % 2 ** 64) >= 0x8000000000000000){
+      result+=1;
+    }
+  }
+
+  // TODO: remove left shifts
+  function nearestUsableTick(int24 tick_, uint24 tickSpacing) internal pure returns (int24 nearestTick){
+    (int128 x, int128 y) = (int128(tick_ << 64), int128(uint128(tickSpacing << 64)));
+
+    nearestTick = int24(divRound(x,y)) * int24(tickSpacing);
+
+    if(nearestTick < TickMath.MIN_TICK){
+      nearestTick += int24(tickSpacing);
+    }else if(nearestTick > TickMath.MAX_TICK) {
+      nearestTick -= int24(tickSpacing);
+    }
+  }
 }
