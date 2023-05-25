@@ -8,31 +8,33 @@ contract UniswapV3Factory {
     address tokenX;
     address tokenY;
     uint24 tickSpacing;
+    uint24 fee;
   }
 
   PoolParameters public parameters;
-  mapping(uint24 => bool) public tickSpacings;
+  mapping(uint24 => uint24) public fees;
   
 
   mapping(address => mapping(address => mapping(uint24 => address))) public pools;
 
-  error UnsupportedTickSpacing();
+  error UnsupportedFee();
   error TokenMustBeDifferent();
   error TokenXCannotBeZero();
 
   event PoolCreated(address tokenX, address tokenY, uint24 tickSpacing, address pool);
 
   constructor (){
-    tickSpacings[60] = true;
+    fees[500] = 10;
+    fees[3000] = 60;
   }
 
   function createPool(
     address tokenX,
     address tokenY,
-    uint24 tickSpacing
+    uint24 fee
   ) external returns (address pool){
 
-    if(!tickSpacings[tickSpacing]) revert UnsupportedTickSpacing();
+    if(fees[fee] == 0) revert UnsupportedFee();
     if(tokenX == tokenY) revert TokenMustBeDifferent();
 
     if(tokenX > tokenY){
@@ -42,11 +44,14 @@ contract UniswapV3Factory {
       revert TokenXCannotBeZero();
     }
 
+    uint24 tickSpacing = fees[fee];
+
     parameters = PoolParameters({
       factory: address(this),
       tokenX: tokenX,
       tokenY: tokenY,
-      tickSpacing: tickSpacing
+      tickSpacing: tickSpacing,
+      fee: fee
     }); 
 
     pool = address(
