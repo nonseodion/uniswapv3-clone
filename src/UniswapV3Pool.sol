@@ -84,6 +84,7 @@ contract UniswapV3Pool {
   error InsufficientInputAmount();
   error NotEnoughLiquidity();
   error InvalidPriceLimit();
+  error FlashLoanNotPaid();
 
   constructor(){
     (, token0, token1, ) = IUniswapV3PoolDeployer(msg.sender).parameters(); 
@@ -168,16 +169,15 @@ contract UniswapV3Pool {
     Position.Info storage position = Position.get(positions, msg.sender, lowerTick, upperTick);
     amount0 = amount0Requested > position.tokensOwed0 ? position.tokensOwed0 : amount0Requested;
     amount1 = amount1Requested > position.tokensOwed1 ? position.tokensOwed1 : amount1Requested;
-    
-    position.tokensOwed0 -= amount0;
-    position.tokensOwed1 -= amount1;
 
     if(amount0 > 0){
       IERC20(token0).transfer(recipient, amount0);
+      position.tokensOwed0 -= amount0;
     }
 
     if(amount1 > 0){
       IERC20(token1).transfer(recipient, amount1);
+      position.tokensOwed1 -= amount1;
     }
 
     emit Collect(msg.sender, recipient, lowerTick, upperTick, amount0, amount1);
@@ -328,13 +328,18 @@ contract UniswapV3Pool {
     uint256 balance0Before = balance0();
     uint256 balance1Before = balance1();
 
+    uint256 fee0 = Math.mulDivRoundingUp(amount0, fee, 1e6);
+    uint256 fee1 = Math.mulDivRoundingUp(amount1, fee, 1e6);
+
     if(amount0 > 0) IERC20(token0).transfer(msg.sender, amount0);
     if(amount1 > 0) IERC20(token1).transfer(msg.sender, amount1);
 
     IUniswapV3FlashCallback(msg.sender).uniswapV3FlashCallback(data);
 
-    require(balance0Before <= balance0(), "Flash amount0 not repaid");
-    require(balance1Before <= balance1(), "Flash amount1 not repaid");
+    if(balance0Before + fee0 > balance0())
+      revert FlashLoanNotPaid();
+    if(balance1Before + fee1 > balance1())
+      revert FlashLoanNotPaid();
 
     emit Flash(msg.sender, amount0, amount1);
   }
