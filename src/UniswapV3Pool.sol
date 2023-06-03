@@ -15,6 +15,7 @@ import { IUniswapV3FlashCallback } from "./interfaces/IUniswapV3FlashCallback.so
 import { IUniswapV3PoolDeployer } from "./interfaces/IUniswapV3PoolDeployer.sol";
 import { mulDiv } from "prb-math/Common.sol";
 import { FixedPoint128 } from "./libraries/FixedPoint128.sol";
+import { Oracle } from "./libraries/Oracle.sol";
 import "forge-std/console.sol";
 
 
@@ -23,6 +24,7 @@ contract UniswapV3Pool {
   using Position for mapping(bytes32 => Position.Info);
   using Position for Position.Info;
   using TickBitMap for mapping(int16 => uint256);
+  using Oracle for Oracle.Observation[65535];
   mapping(int16 => uint256) public tickBitMap;
 
   int24 constant MIN_TICK = -887272;
@@ -36,6 +38,10 @@ contract UniswapV3Pool {
     uint160 sqrtPriceX96;
     // current tick
     int24 tick;
+
+    uint16 observationIndex;
+    uint16 observationCardinality;
+    uint16 observationCardinalityNext;
   }
 
   struct SwapState {
@@ -69,6 +75,7 @@ contract UniswapV3Pool {
   uint24 public fee;
   uint256 public feeGrowthGlobal0X128;
   uint256 public feeGrowthGlobal1X128;
+  Oracle.Observation[65535] public observations;
 
   mapping(bytes32 => Position.Info) public positions;
   mapping(int24 => Tick.Info) public ticks;
@@ -78,6 +85,7 @@ contract UniswapV3Pool {
   event Burn(address owner, int24 lowerTick, int24 upperTick, uint128 amount, uint amount0, uint amount1);
   event Swap(address swapper, address recipient, int256 amount0Delta, int256 amount1Delta, uint160 sqrtPriceX96, uint128 liquidity, int24 tick);
   event Flash(address borrower, uint256 amount0, uint256 amount1);
+  event IncreasedObservationCardinalityNext(uint16 observationCardinalityNextOld, uint16 observationCardinalityNextNew);
 
   error InvalidTickRange();
   error ZeroLiquidity();
@@ -93,7 +101,15 @@ contract UniswapV3Pool {
   function initialize(uint160 sqrtPriceX96) public {
     int24 tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96);
 
-    slot0 = Slot0({tick: tick, sqrtPriceX96: sqrtPriceX96});
+    (uint16 observationCardinality, uint16 observationCardinalityNext) = observations.initialize(block.timestamp);
+
+    slot0 = Slot0({
+      tick: tick, 
+      sqrtPriceX96: sqrtPriceX96, 
+      observationIndex: 0, 
+      observationCardinality: observationCardinality,
+      observationCardinalityNext: observationCardinalityNext
+    });
   }
 
   function mint(
@@ -195,14 +211,13 @@ contract UniswapV3Pool {
         : slot0.sqrtPriceX96 > sqrtPriceLimit || sqrtPriceLimit > TickMath.MAX_SQRT_RATIO
       ) revert InvalidPriceLimit();
 
-    // int24 nextTick = 85184;
-    // uint160 nextPrice = 5604469350942327889444743441197;
+    Slot0 memory slot0_ = slot0;
     uint128 liquidity_ = liquidity;
     SwapState memory swapState = SwapState(
       amountSpecified,
       0,
-      slot0.sqrtPriceX96,
-      slot0.tick,
+      slot0_.sqrtPriceX96,
+      slot0_.tick,
       liquidity_,
       zeroForOne ? feeGrowthGlobal0X128 : feeGrowthGlobal1X128
     );
@@ -266,8 +281,6 @@ contract UniswapV3Pool {
         swapState.tick = TickMath.getTickAtSqrtRatio(swapState.sqrtPriceX96);
       }
 
-
-
       swapState.amountSpecifiedRemaining -= stepState.amountIn;
       swapState.amountCalculated += stepState.amountOut;
     }
@@ -275,8 +288,25 @@ contract UniswapV3Pool {
 
     if(swapState.liquidity != liquidity_) liquidity = swapState.liquidity;
 
-    if(slot0.tick != swapState.tick){
-      slot0 = Slot0(swapState.sqrtPriceX96, swapState.tick);
+    if(slot0_.tick != swapState.tick){
+      (uint16 observationIndex, uint16 observationCardinality) = observations.write(
+        slot0_.tick,
+        slot0_.observationIndex,
+        block.timestamp,
+        slot0_.observationCardinality,
+        slot0_.observationCardinalityNext
+      );
+      (
+        slot0.sqrtPriceX96,
+        slot0.tick,
+        slot0.observationIndex,
+        slot0.observationCardinality
+      ) = (
+        swapState.sqrtPriceX96, 
+        swapState.tick,
+        observationIndex,
+        observationCardinality
+      );
     }
 
     (amount0, amount1) = zeroForOne 
@@ -344,6 +374,18 @@ contract UniswapV3Pool {
     emit Flash(msg.sender, amount0, amount1);
   }
 
+  function increaseObservationCardinalityNext(
+    uint16 next
+  ) public{
+    uint16 observationCardinalityNextOld = slot0.observationCardinalityNext;
+    uint16 observationCardinalityNextNew = observations.grow(next, observationCardinalityNextOld);
+
+    if(observationCardinalityNextNew > observationCardinalityNextOld){
+      slot0.observationCardinalityNext = observationCardinalityNextNew;
+      emit IncreasedObservationCardinalityNext(observationCardinalityNextOld, observationCardinalityNextNew);
+    }
+  }
+
   function balance0() internal view returns (uint) {
     return IERC20(token0).balanceOf(address(this));
   }
@@ -390,7 +432,7 @@ contract UniswapV3Pool {
         uint128(params.liquidityDelta)
       );
 
-      amount1 = Math.calcAmount1Delta(
+      amount1 = Math.calcAmount1Delta( 
         slot0_.sqrtPriceX96, 
         TickMath.getSqrtRatioAtTick(params.lowerTick), 
         uint128(params.liquidityDelta)
