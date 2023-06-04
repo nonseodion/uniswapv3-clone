@@ -72,6 +72,8 @@ contract UniswapV3Pool {
   Slot0 public slot0;
 
   uint128 public liquidity;
+  address public factory;
+  uint24 public tickSpacing;
   uint24 public fee;
   uint256 public feeGrowthGlobal0X128;
   uint256 public feeGrowthGlobal1X128;
@@ -95,7 +97,7 @@ contract UniswapV3Pool {
   error FlashLoanNotPaid();
 
   constructor(){
-    (, token0, token1, ) = IUniswapV3PoolDeployer(msg.sender).parameters(); 
+    (factory, token0, token1, tickSpacing, fee) = IUniswapV3PoolDeployer(msg.sender).parameters(); 
   }
 
   function initialize(uint160 sqrtPriceX96) public {
@@ -401,7 +403,7 @@ contract UniswapV3Pool {
     int256 amount0, 
     int256 amount1
   ) {
-    Slot0 memory slot0_;
+    Slot0 memory slot0_ = slot0;
 
     bool flipUpper = ticks.update(params.upperTick, slot0_.tick, params.liquidityDelta, feeGrowthGlobal0X128, feeGrowthGlobal1X128, true);
     bool flipLower = ticks.update(params.lowerTick, slot0_.tick, params.liquidityDelta, feeGrowthGlobal0X128, feeGrowthGlobal1X128, false);
@@ -419,6 +421,7 @@ contract UniswapV3Pool {
       feeGrowthInside1X128 
     );
 
+    console.log(uint24(params.lowerTick), uint24(slot0_.tick));
     if(params.lowerTick > slot0_.tick){
 
       amount0 = Math.calcAmount0Delta(

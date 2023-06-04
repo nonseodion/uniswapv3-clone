@@ -27,7 +27,7 @@ contract UniswapV3ManagerTest is UniswapV3PoolUtils{
     uint160 currentPrice;
     LiquidityRange[] liquidity;
     bool mintLiqudity;
-    uint24 tickSpacing;
+    uint24 fee;
   }
 
   UniswapV3Factory factory;
@@ -105,7 +105,7 @@ contract UniswapV3ManagerTest is UniswapV3PoolUtils{
       params.currentPrice = tokenProps[i][pools[i][0]].sqrtPriceX96;
       params.liquidity.push(liquidity[0]);
       params.mintLiqudity = true;
-      params.tickSpacing = 60;
+      params.fee = 500; 
 
       setupTestCase();
       delete(params.liquidity);
@@ -125,7 +125,7 @@ contract UniswapV3ManagerTest is UniswapV3PoolUtils{
       ERC20Mintable(params.token0).mint(address(this), params.token0Balance);
       ERC20Mintable(params.token1).mint(address(this), params.token1Balance);
 
-      UniswapV3Pool pool = UniswapV3Pool(factory.createPool(address(params.token0), address(params.token1), params.tickSpacing));
+      UniswapV3Pool pool = UniswapV3Pool(factory.createPool(address(params.token0), address(params.token1), params.fee));
       pool.initialize(params.currentPrice);
 
       if(params.mintLiqudity){

@@ -7,6 +7,7 @@ import {LiquidityMath} from "./libraries/LiquidityMath.sol";
 import {TickMath} from "./libraries/TickMath.sol";
 import { IERC20Minimal as IERC20 } from "./interfaces/IERC20Minimal.sol";
 import { NFTRenderer } from "./libraries/NFTRenderer.sol";
+import "forge-std/console.sol";
 
 contract UniswapV3NFTManager is ERC721 {
     struct TokenPosition {
@@ -100,6 +101,7 @@ contract UniswapV3NFTManager is ERC721 {
         if(tokenPosition.pool == address(0x0)) {
             revert WrongToken();
         }
+        console.log(tokenPosition.pool);
         uint24 fee = IUniswapV3Pool(tokenPosition.pool).fee(); 
 
         return NFTRenderer.render( 
@@ -127,12 +129,12 @@ contract UniswapV3NFTManager is ERC721 {
             })
         );
 
-        uint256 id = nextTokenId++;
-        _mint(params.recipient, id);
+        tokenId = nextTokenId++;
+        _mint(params.recipient, tokenId);
         totalSupply++;
 
-        positions[id] = TokenPosition(pool, params.lowerTick, params.upperTick);
-        emit AddLiquidity(id, liquidity, amount0, amount1);
+        positions[tokenId] = TokenPosition(pool, params.lowerTick, params.upperTick);
+        emit AddLiquidity(tokenId, liquidity, amount0, amount1);
     }
 
     function addLiquidity(
@@ -234,9 +236,11 @@ contract UniswapV3NFTManager is ERC721 {
       uint160 lowerPrice = TickMath.getSqrtRatioAtTick(params.lowerTick);
       uint160 upperPrice = TickMath.getSqrtRatioAtTick(params.upperTick);
       (uint160 sqrtPriceX96, , , ,  ) = IUniswapV3Pool(params.pool).slot0();
+      
       liquidity = LiquidityMath.getLiquidityForAmounts(sqrtPriceX96, lowerPrice, upperPrice, params.amount0Desired, params.amount1Desired);
       bytes memory data = abi.encode(IUniswapV3Pool.MintCallbackData(IUniswapV3Pool(params.pool).token0(), IUniswapV3Pool(params.pool).token1(), msg.sender));
 
+      console.log(uint24(params.lowerTick), uint24(params.upperTick));
       (amount0, amount1) = IUniswapV3Pool(params.pool).mint( 
           address(this),
           liquidity,
@@ -255,7 +259,7 @@ contract UniswapV3NFTManager is ERC721 {
       bytes calldata data
   ) external {
     IUniswapV3Pool.MintCallbackData memory extra = abi.decode(data, (IUniswapV3Pool.MintCallbackData)); 
-    
+    console.log(amount0Owed, amount1Owed);
     IERC20(extra.token0).transferFrom(extra.payer, msg.sender, amount0Owed);
     IERC20(extra.token1).transferFrom(extra.payer, msg.sender, amount1Owed);
   }

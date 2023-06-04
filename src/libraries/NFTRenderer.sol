@@ -4,6 +4,7 @@ import { Strings } from "openzeppelin-contracts/utils/Strings.sol";
 import { IUniswapV3Pool } from "../interfaces/IUniswapV3Pool.sol";
 import { IERC20Minimal as IERC20 } from "../interfaces/IERC20Minimal.sol";
 import { Base64 } from "openzeppelin-contracts/utils/Base64.sol";
+import "forge-std/console.sol";
 
 library NFTRenderer {
   using Strings for string;
@@ -18,7 +19,8 @@ library NFTRenderer {
 
   function render(
     RenderParams memory params
-  ) internal view returns ( string memory) { 
+  ) internal view returns ( string memory) {
+    console.log(params.fee,"fee");
     string memory symbol0 = IERC20(IUniswapV3Pool(params.pool).token0()).symbol(); 
     string memory symbol1 = IERC20(IUniswapV3Pool(params.pool).token1()).symbol();
 
@@ -29,7 +31,8 @@ library NFTRenderer {
       ".tick {font: normal 18px sans-serif;} </style>",
       renderBackground(params.owner, params.lowerTick, params.upperTick),
       renderTop(params.fee, symbol0, symbol1),
-      renderBottom(params.lowerTick, params.upperTick)
+      renderBottom(params.lowerTick, params.upperTick),
+      "</svg>"
     );
 
     string memory description = renderDescription(params.fee, params.lowerTick, params.upperTick, symbol0, symbol1);
@@ -104,7 +107,7 @@ library NFTRenderer {
       symbol0,
       "/",
       symbol1,
-      ", ",
+      " ",
       feeToText(fee),
       ", Lower Tick: ",
       tickToText(lowerTick),
@@ -118,6 +121,7 @@ library NFTRenderer {
       return "0.05%";
     else if(fee == 3000)
       return "0.3%";
+    return "";
   }
 
   function tickToText(int24 tick) internal pure returns (string memory ){
