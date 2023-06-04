@@ -7,9 +7,9 @@ library Oracle {
     bool initialized;
   }
 
-  function initialize (Observation[] memory self, uint32 timestamp) internal returns (uint16 cardinality, uint16 cardinalityNext) {
+  function initialize (Observation[65535] memory self, uint256 timestamp) internal pure returns (uint16 cardinality, uint16 cardinalityNext) {
     self[0] = Observation(
-      timestamp,
+      uint32(timestamp),
       0,
       true
     );
@@ -19,7 +19,7 @@ library Oracle {
   }
 
   function write(
-    Observation[] memory self, 
+    Observation[65535] memory self, 
     int24 tick,
     uint16 index,
     uint32 timestamp,

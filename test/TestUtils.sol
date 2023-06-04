@@ -44,16 +44,16 @@ abstract contract TestUtils is Test {
     assertEq( expected.token1.balanceOf(address(expected.pool)), expected.amount1, "Incorrect token1 deposited amount");
 
     bytes32 positionKey = keccak256(abi.encodePacked(address(this), expected.lowerTick, expected.upperTick));
-    uint128 posLiquidity = expected.pool.positions(positionKey);
+    (uint128 posLiquidity, , , , ) = expected.pool.positions(positionKey);
 
     assertEq(posLiquidity, expected.liquidity, "Incorrect position liquidity");
 
-    (bool tickInitialized, uint128 liquidityGross, int128 liquidityNet) = expected.pool.ticks(expected.lowerTick);
+    (bool tickInitialized, uint128 liquidityGross, int128 liquidityNet, , ) = expected.pool.ticks(expected.lowerTick);
     assertTrue(tickInitialized, "Lower Tick not initialized");
     assertEq(liquidityGross, expected.liquidityGross, "Incorrect Lower Tick Gross liquidity");
     assertEq(liquidityNet, expected.liquidityNet, "Incorrect Lower Tick Net liquidity");
 
-    (tickInitialized, liquidityGross, liquidityNet) = expected.pool.ticks(expected.upperTick);
+    (tickInitialized, liquidityGross, liquidityNet, , ) = expected.pool.ticks(expected.upperTick);
     assertTrue(tickInitialized, "Upper Tick not initialized");
     assertEq(liquidityGross, expected.liquidityGross, "Incorrect Upper Tick liquidity");
     assertEq(liquidityNet, -expected.liquidityNet, "Incorrect Upper Tick Net liquidity");
@@ -61,7 +61,7 @@ abstract contract TestUtils is Test {
     assertTrue(tickInBitMap(expected.pool, expected.lowerTick), "Lower tick not initialized in bitmap");
     assertTrue(tickInBitMap(expected.pool, expected.upperTick), "Upper tick not initialized in bitmap");
 
-    (uint160 sqrtPrice96, int24 tick_) = expected.pool.slot0();
+    (uint160 sqrtPrice96, int24 tick_, , , ) = expected.pool.slot0();
     assertEq(sqrtPrice96, expected.sqrtPrice, "Incorrect current price");
     assertEq(tick_, expected.tick, "Current tick is incorrect");
 
@@ -92,7 +92,7 @@ abstract contract TestUtils is Test {
     assertEq(expected.token1.balanceOf(address(expected.pool)), expected.poolBalance1, "Invalid pool token1 balance");
     assertEq(expected.token0.balanceOf(address(expected.pool)), expected.poolBalance0, "Invalid pool token0 balance");
 
-    (uint160 price, int24 tick_) = expected.pool.slot0();
+    (uint160 price, int24 tick_, , , ) = expected.pool.slot0();
     uint128 liquidity = expected.pool.liquidity();
 
     // check pool state

@@ -101,7 +101,7 @@ contract UniswapV3Manager{
     {
       uint160 sqrtPriceAX96 = TickMath.getSqrtRatioAtTick(lowerTick);
       uint160 sqrtPriceBX96 = TickMath.getSqrtRatioAtTick(upperTick);
-      (uint160 currentPrice, ) = UniswapV3Pool(pool).slot0();
+      (uint160 currentPrice, , , , ) = UniswapV3Pool(pool).slot0();
       liquidity = LiquidityMath.getLiquidityForAmounts(
         currentPrice,
         sqrtPriceAX96,

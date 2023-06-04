@@ -136,7 +136,7 @@ contract Quoter {
             : uint256(-amount0Delta);
 
         address pool = abi.decode(data, (address));
-        (uint160 slot, int24 tick) = UniswapV3Pool(pool).slot0();
+        (uint160 slot, int24 tick, , , ) = UniswapV3Pool(pool).slot0();
 
         assembly {
             let freeMemoryPointer := mload(0x40)

@@ -7,13 +7,13 @@ library PoolAddress {
     address factory,
     address tokenX,
     address tokenY,
-    uint24 tickSpacing
+    uint24 fee
   ) internal pure returns(address pool) {
     if(tokenX > tokenY) {
       (tokenX, tokenY) = (tokenY, tokenX);
     }
 
-    bytes32 salt = keccak256(abi.encodePacked(tokenX, tokenY, tickSpacing));
+    bytes32 salt = keccak256(abi.encodePacked(tokenX, tokenY, fee));
 
     pool = address(uint160(uint256(keccak256(abi.encodePacked(
       uint8(0xff),
