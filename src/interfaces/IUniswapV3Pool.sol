@@ -19,8 +19,10 @@ interface IUniswapV3Pool{
       uint16 observationCardinalityNext
     );
 
-  function token0() external returns (address);
-  function token1() external returns (address);
+  function token0() external view returns (address);
+  function token1() external view returns (address);
+  function fee() external view returns (uint24);
+
   function positions(bytes32 positionId) external returns (
     uint128 liquidity,
     uint256 feeGrowthInside0LastX128,

@@ -6,6 +6,7 @@ import {IUniswapV3Pool} from "./interfaces/IUniswapV3Pool.sol";
 import {LiquidityMath} from "./libraries/LiquidityMath.sol";
 import {TickMath} from "./libraries/TickMath.sol";
 import { IERC20Minimal as IERC20 } from "./interfaces/IERC20Minimal.sol";
+import { NFTRenderer } from "./libraries/NFTRenderer.sol";
 
 contract UniswapV3NFTManager is ERC721 {
     struct TokenPosition {
@@ -94,7 +95,22 @@ contract UniswapV3NFTManager is ERC721 {
     }
 
     function tokenURI(uint256 id) public view override returns (string memory) {
-        return "";
+
+        TokenPosition memory tokenPosition = positions[id];
+        if(tokenPosition.pool == address(0x0)) {
+            revert WrongToken();
+        }
+        uint24 fee = IUniswapV3Pool(tokenPosition.pool).fee(); 
+
+        return NFTRenderer.render( 
+            NFTRenderer.RenderParams({
+                pool: tokenPosition.pool,
+                fee: fee,
+                owner: address(this),
+                lowerTick: tokenPosition.lowerTick,
+                upperTick: tokenPosition.upperTick
+            })
+        );
     }
 
     function mint(MintParams calldata params) public returns (uint256 tokenId) {

@@ -49,4 +49,6 @@ interface IERC20Minimal {
     /// @param spender The account for which the spending allowance was modified
     /// @param value The new allowance from the owner to the spender
     event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    function symbol() external view returns (string memory);
 }
