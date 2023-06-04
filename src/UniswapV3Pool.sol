@@ -118,7 +118,7 @@ contract UniswapV3Pool {
     int24 lowerTick,
     int24 upperTick,
     bytes calldata data
-  ) public returns(uint amount0, uint amount1){
+  ) public returns(uint256 amount0, uint256 amount1){
     if(
       lowerTick >= upperTick 
       || lowerTick < MIN_TICK
@@ -157,10 +157,9 @@ contract UniswapV3Pool {
     uint128 amount, 
     int24 lowerTick, 
     int24 upperTick
-  ) public returns(int256 amount0, int256 amount1){
-    Position.Info storage position;
+  ) public returns(uint256 amount0, uint256 amount1){
     //todo: check the liquidityDelta
-    (position, amount0, amount1) = _modifyPosition(ModifyPositionParams({
+    (Position.Info storage position, int256 amount0_, int256 amount1_) = _modifyPosition(ModifyPositionParams({
       owner: msg.sender,
       lowerTick: lowerTick,
       upperTick: upperTick,
@@ -168,11 +167,14 @@ contract UniswapV3Pool {
     }));
 
     if(amount0 < 0 || amount1 < 0){
-      position.tokensOwed0 += uint256(-amount0);
-      position.tokensOwed1 += uint256(-amount1);
+      position.tokensOwed0 += uint256(-amount0_);
+      position.tokensOwed1 += uint256(-amount1_);
     }
 
-    emit Burn(msg.sender, lowerTick, upperTick, amount, uint256(-amount0), uint256(-amount1));
+    amount0 = uint256(-amount0_);
+    amount1 = uint256(-amount1_);
+
+    emit Burn(msg.sender, lowerTick, upperTick, amount, amount0, amount1);
   }
 
   function collect(
@@ -181,7 +183,7 @@ contract UniswapV3Pool {
     int24 upperTick,
     uint256 amount0Requested,
     uint256 amount1Requested
-  ) public returns(uint128 amount0, uint128 amount1){
+  ) public returns(uint256 amount0, uint256 amount1){
     Position.Info storage position = Position.get(positions, msg.sender, lowerTick, upperTick);
     amount0 = amount0Requested > position.tokensOwed0 ? position.tokensOwed0 : amount0Requested;
     amount1 = amount1Requested > position.tokensOwed1 ? position.tokensOwed1 : amount1Requested;
@@ -292,7 +294,7 @@ contract UniswapV3Pool {
       (uint16 observationIndex, uint16 observationCardinality) = observations.write(
         slot0_.tick,
         slot0_.observationIndex,
-        block.timestamp,
+        _blockTimestamp(),
         slot0_.observationCardinality,
         slot0_.observationCardinalityNext
       );
@@ -364,7 +366,7 @@ contract UniswapV3Pool {
     if(amount0 > 0) IERC20(token0).transfer(msg.sender, amount0);
     if(amount1 > 0) IERC20(token1).transfer(msg.sender, amount1);
 
-    IUniswapV3FlashCallback(msg.sender).uniswapV3FlashCallback(data);
+    IUniswapV3FlashCallback(msg.sender).uniswapV3FlashCallback(fee0, fee1, data);
 
     if(balance0Before + fee0 > balance0())
       revert FlashLoanNotPaid();
@@ -429,13 +431,13 @@ contract UniswapV3Pool {
       amount0 = Math.calcAmount0Delta(
         slot0_.sqrtPriceX96, 
         TickMath.getSqrtRatioAtTick(params.upperTick), 
-        uint128(params.liquidityDelta)
+        params.liquidityDelta
       );
 
       amount1 = Math.calcAmount1Delta( 
         slot0_.sqrtPriceX96, 
         TickMath.getSqrtRatioAtTick(params.lowerTick), 
-        uint128(params.liquidityDelta)
+        params.liquidityDelta
       );
 
       liquidity = LiquidityMath.addLiquidity(liquidity, params.liquidityDelta) ;
@@ -444,8 +446,12 @@ contract UniswapV3Pool {
       amount1 = Math.calcAmount1Delta(
         TickMath.getSqrtRatioAtTick(params.lowerTick), 
         TickMath.getSqrtRatioAtTick(params.upperTick), 
-        uint128(params.liquidityDelta)
+        params.liquidityDelta
       );
     }
+  }
+
+  function _blockTimestamp() internal view returns (uint32){
+    return uint32(block.timestamp);
   }
 }
