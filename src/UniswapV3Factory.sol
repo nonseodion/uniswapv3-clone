@@ -56,15 +56,15 @@ contract UniswapV3Factory {
 
     pool = address(
       new UniswapV3Pool{
-        salt: keccak256(abi.encodePacked(tokenX, tokenY, tickSpacing))
+        salt: keccak256(abi.encodePacked(tokenX, tokenY, fee))
       }()
     );
 
     delete parameters;
 
-    pools[tokenX][tokenY][tickSpacing] = pool;
-    pools[tokenY][tokenX][tickSpacing] = pool;
+    pools[tokenX][tokenY][fee] = pool;
+    pools[tokenY][tokenX][fee] = pool;
 
-    emit PoolCreated(tokenX, tokenY, tickSpacing, pool);
+    emit PoolCreated(tokenX, tokenY, fee, pool);
   }
 }

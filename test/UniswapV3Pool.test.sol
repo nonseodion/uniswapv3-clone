@@ -16,7 +16,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
   UniswapV3Pool pool;
   UniswapV3Factory factory;
 
-  uint24 immutable tickSpacing = 60;
+  uint24 immutable fee = 500;
 
   bool shouldTransferInMintCallback;
   bool shouldTransferInSwapCallback;
@@ -464,7 +464,7 @@ contract UniswapV3PoolTest is UniswapV3PoolUtils{
       factory.createPool(
         address(token0),
         address(token1),
-        tickSpacing
+        fee
       )
     );
     pool.initialize(sqrtP(params.currentPrice));
